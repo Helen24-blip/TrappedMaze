@@ -2,6 +2,14 @@ import pygame
 import sys
 
 pygame.init()
+pygame.mixer.init()  # <-- Инициализация микшера для работы со звуками
+
+# Загрузка звуков
+trap_sound = pygame.mixer.Sound("trap_soun.wav")
+exit_sound = pygame.mixer.Sound("exit_sound.wav")
+life_loss_sound = pygame.mixer.Sound("life_loss.wav")
+
+background_image = pygame.image.load("background.jpg")
 
 # Параметры окна
 WIDTH, HEIGHT = 640, 480
@@ -19,6 +27,8 @@ GREEN = (0, 255, 0)
 # Класс для игрока
 class Player:
     def __init__(self, x, y, width, height):
+        self.image = pygame.image.load("player_image.png.png")  # Загрузка изображения
+        self.image = pygame.transform.scale(self.image, (width, height))  # Масштабирование
         self.rect = pygame.Rect(x, y, width, height)
         self.speed = 5
         self.lives = 3  # Добавляем жизни
@@ -34,7 +44,7 @@ class Player:
             self.rect.y += self.speed
 
     def draw(self, window):
-        pygame.draw.rect(window, BLUE, self.rect)
+        window.blit(self.image, (self.rect.x, self.rect.y))  # Отрисовка изображения
         # Отображаем количество жизней
         font = pygame.font.Font(None, 36)
         text = font.render(f"Lives: {self.lives}", True, BLACK)
@@ -123,11 +133,13 @@ class Timer:
         self.start_ticks = pygame.time.get_ticks()
 
     def draw(self, window):
-        # Подсчет времени (секунды)
         elapsed_time = (pygame.time.get_ticks() - self.start_ticks) // 1000
-        font = pygame.font.Font(None, 36)
-        text = font.render(f"Time: {elapsed_time}", True, BLACK)
-        window.blit(text, (10, 10))
+
+    def draw_timer(time_left):
+         font = pygame.font.SysFont(None, 36)
+         timer_text = font.render(f"Время: {time_left}", True, (0, 0, 0))
+         WINDOW.blit(timer_text, (WINDOW.get_width() - 150, 10))  # В правом верхнем углу
+
 
 class Score:
     def __init__(self):
@@ -140,6 +152,46 @@ class Score:
         font = pygame.font.SysFont(None, 36)
         score_text = font.render(f'Score: {self.points}', True, (0, 0, 0))
         window.blit(score_text, (10, 10))  # Отрисовка очков в верхнем левом углу
+
+
+def main_menu():
+    font = pygame.font.SysFont(None, 36)
+    font = pygame.font.Font("ofont.ru_X Company.ttf", 32)  # Загрузка шрифта
+    while True:
+        WINDOW.fill(WHITE)
+        WINDOW.blit(background_image, (0, 0))  # Установка заставки на весь экран
+        menu_text = font.render('Главное меню', True, (0, 0, 0))
+        start_text = font.render('Нажмите S для начала игры', True, (0, 0, 0))
+        exit_text = font.render('Нажмите Q для выхода', True, (0, 0, 0))
+
+        WINDOW.blit(menu_text, (WINDOW.get_width() // 2 -150, 100))
+        WINDOW.blit(start_text, (WINDOW.get_width() // 2 - 240, 300))
+        WINDOW.blit(exit_text, (WINDOW.get_width() // 2 - 215, 400))
+
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_s:
+                    return  # Начинаем игру
+                if event.key == pygame.K_q:
+                    pygame.quit()
+                    sys.exit()
+
+
+
+def game_over():
+    font = pygame.font.SysFont(None, 74)
+    game_over_text = font.render('Game Over', True, (255, 0, 0))
+    WINDOW.fill(WHITE)
+    WINDOW.blit(game_over_text, (WINDOW.get_width() // 2 - 150, WINDOW.get_height() // 2 - 50))
+    pygame.display.flip()
+    pygame.time.delay(2000)  # Задержка 2 секунды для проигрывания звука
+    pygame.quit()
+    sys.exit()
 
 # Основной игровой цикл
 def game_loop():
@@ -180,12 +232,15 @@ def game_loop():
         # Проверка столкновений с ловушками
         for trap in maze.traps:
             if player.rect.colliderect(trap):
+                 trap_sound.play()  # <-- Звук попадания в ловушку
                  player.lives -= 1  # Уменьшение жизней при столкновении
                  print(f"Попали в ловушку! Осталось жизней: {player.lives}")
                  player.rect.x, player.rect.y = 50, 50
                  score.add_points(-50)  # Вычитаем 50 очков при попадании в ловушку
 
                  if player.lives == 0:
+                     life_loss_sound.play()  # <-- Звук потери жизни
+                     game_over()  # Переход на экран окончания игры
                      print("Игра окончена!")
                      pygame.quit()
                      sys.exit()
@@ -193,28 +248,35 @@ def game_loop():
         # Проверка столкновений с движущимися ловушками
         for moving_trap in maze.moving_traps:
             if player.rect.colliderect(moving_trap.rect):
+                 trap_sound.play()  # <-- Звук попадания в ловушку
                  player.lives -= 1
                  print(f"Попали в движущуюся ловушку! Осталось жизней: {player.lives}")
                  player.rect.x, player.rect.y = 50, 50
                  score.add_points(-50)  # Вычитаем 50 очков при попадании в движущуюся ловушку
 
                  if player.lives == 0:
+                     life_loss_sound.play()  # <-- Звук потери жизни
+                     game_over()  # Переход на экран окончания игры
                      print("Игра окончена!")
                      pygame.quit()
                      sys.exit()
 
         # Проверка выхода из лабиринта
         if player.rect.colliderect(maze.exit):
+            exit_sound.play()  # <-- Звук при выходе на следующий уровень
             print(f"Уровень {level} пройден!")
             score.add_points(100)  # Добавляем 100 очков за прохождение уровня
             level += 1
             if level > 2:  # Допустим, у нас два уровня
+                exit_sound.play()  # <-- Звук при победе
                 print("Поздравляю, игра пройдена!")
                 pygame.quit()
                 sys.exit()
             else:
                  maze = Maze(level)  # Загрузить следующий уровень
                  player.rect.x, player.rect.y = 50, 50  # Возвращаем игрока на старт
+
+
 
         # Отрисовка
         WINDOW.fill(WHITE)
@@ -227,4 +289,6 @@ def game_loop():
 
 # Запуск игры
 if __name__ == "__main__":
+    # Вызов главного меню перед началом игры
+    main_menu()
     game_loop()
